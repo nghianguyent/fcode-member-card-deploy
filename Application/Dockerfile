@@ -1,12 +1,10 @@
-FROM node:8
-LABEL maintainer="Azure App Services Container Images <appsvc-images@microsoft.com>"
-
-# Create app directory
-WORKDIR /app
-
-# Bundle app source
+FROM node:alpine
+ENV    NODE_ENV=production
+WORKDIR /usr/src/app
+COPY ["package.json", "package-lock.json*", "npm-shrinkwrap.json*", "./"]
+RUN npm install --production --silent && mv node_modules ../
 COPY . .
-RUN npm install
-
-EXPOSE 3000 80
-CMD [ "npm", "start" ]
+EXPOSE 4000
+RUN chown -R node /usr/src/app
+USER node
+CMD ["npm", "run", "devStart"]

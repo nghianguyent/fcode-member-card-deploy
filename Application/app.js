@@ -1,82 +1,66 @@
-﻿'use strict';
-var debug = require('debug');
-var express = require('express');
-var path = require('path');
-var favicon = require('serve-favicon');
-var logger = require('morgan');
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
+const express = require('express');
+const logger = require('morgan');
+const cors = require('cors');
+const helmet = require('helmet');
+const env = require('dotenv');
+const api = require('./routes');
+const bodyParser = require('body-parser');
+const eventsRoute = require('./routes/events');
+const app = express();
+const configs = require('./configs');
 
-var routes = require('./routes/index');
-var users = require('./routes/users');
+// config
+env.config();
+const port = process.env.PORT || 3000;
 
-var appInsights = require('applicationinsights');
-if(process.env.NODE_ENV == "production"){
-    appInsights.setup();
-    appInsights.start();
-}
-
-var server; 
-var app = express();
-
-// view engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'pug');
-
-// uncomment after placing your favicon in /public
-//app.use(favicon(__dirname + '/public/favicon.ico'));
 app.use(logger('dev'));
+// Add headers
+app.use((req, res, next) => {
+	res.setHeader('Access-Control-Allow-Origin', '*');
+	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+	res.setHeader('Access-Control-Allow-Headers', '*');
+	res.setHeader('Access-Control-Allow-Credentials', false);
+	next();
+});
+// create cors
+app.use(cors());
+app.use(express.json());
+// body-passer
+app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+// middleware
+app.use('/api', api);
 
-app.use('/', routes);
-app.use('/users', users);
-
-// catch 404 and forward to error handler
-app.use(function (req, res, next) {
-    var err = new Error('Not Found');
-    err.status = 404;
-    next(err);
+app.get('/', (req, res) => {
+	const requestQuery = req.query;
+	res.status(200).json(requestQuery);
+});
+// listen on port
+app.listen(port, () => {
+	console.log(`listening on ${port}`);
 });
 
-// error handlers
-
-// development error handler
-// will print stacktrace
-if (app.get('env') === 'development') {
-    app.use(function (err, req, res, next) {
-        res.status(err.status || 500);
-        res.render('error', {
-            message: err.message,
-            error: err
-        });
-    });
-}
-
-// production error handler
-// no stacktraces leaked to user
-app.use(function (err, req, res, next) {
-    res.status(err.status || 500);
-    res.render('error', {
-        message: err.message,
-        error: {}
-    });
+app.use((req, res) => {
+	return res.status(400).json({
+		success: false,
+		error: {
+			message: 'Unable to locate the request resource',
+			code: 400,
+		},
+	});
 });
 
-app.set('port', process.env.PORT || 3000);
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+	// cusstom handle errors
 
-exports.listen = function () {
-    server = app.listen(app.get('port'), function () {
-        debug('Express server listening on port ' + server.address().port);
-    });
-}
+	// handle OAuth error
+	if (!req.user) {
+		return res.status(500).json({
+			success: false,
+			error: err,
+		});
+	}
+});
 
-exports.close = function () {
-    server.close(() => {
-        debug('Server stopped.');
-    });
-}
-
-this.listen();
+module.exports = app;
